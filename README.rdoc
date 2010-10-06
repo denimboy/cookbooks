@@ -6,8 +6,12 @@ Tested mainly under Ubuntu 10.04.
 
 = REQUIREMENTS:
 
-chef-solo or chef-server
+chef-solo or chef-server.  Tested under chef-solo with Vagrant and RightScale.
 
 = ATTRIBUTES:
 
 = USAGE:
+
+= AUTHORS:
+
+Dennis Watson
