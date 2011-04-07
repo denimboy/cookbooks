@@ -1,0 +1,54 @@
+= DESCRIPTION:
+
+This is a recipe and definition for Chef that makes it easy to configure a firewall within your recipes.
+Including the recipe sets the firewall to a reasonably secure default of deny all incoming but allow all outgoing packets.
+In addition the recipe provides a chef definition which makes it simple to open the firewall in the recipe which configures the service that needs it.
+The dream is you can configure a server to allow port 80 if and only if an web server recipe is run and always when the web server ecipe is run.
+
+= REQUIREMENTS:
+
+UFW (Uncomplicated Firewall) is the default firewall configuration tool for Ubuntu.  It is shipped by default on modern versions Ubuntu.  It can be 
+installed on Debian and probably Redhat style distros but the
+
+= ATTRIBUTES:
+
+If you don't specify an attribute then it gets its default value.  You MUST specify one attribute else it will disable the firewall.
+
+ - from - Source address of packets.  Defaults to "any".
+ - to - Destination address of packets.  Defaults to "any".
+ - port - Destination port of packets.  Defaults to "any".
+ - proto - Protocol of packets.  One of udp, tcp.  Defaults to "tcp".
+ - action - WHat to do with packets.  one of allow, deny.  Default is "allow".
+
+= USAGE:
+
+Let's explain with a couple examples.  Imagine we are in a recipe:
+
+# First pull in the UFW recipe
+require "ufw::default"
+
+# Next let's say you add ruby on rails
+require "myapp::rails"
+
+# Finally open up the firewall for rails dev
+ufw_rule "firewall allow rails" do
+  port "3000"
+  from "10.0.0.0/8"
+end
+
+= COPYRIGHT:
+
+Copyright 2011 Dennis Watson. All rights reserved.
+Redistributable under terms of the 2 clause BSD Licence.  See COPYRIGHT file.
+
+= TODO:
+
+ - Could be parameterized; list of ports we want opened by default or another flag if we want the default deny incomping packets rule applied.
+ - Install UFW if not installed by default like on Debian and RedHat.
+ - Test on non-ubuntu distros; debian, redhat.
+ - Test various incantaions of the ufw_rule definition.
+
+= SEE ALSO:
+
+  UFW Uncomplicated Firewall Documentation - https://help.ubuntu.com/community/UFW
+  iptables - http://en.wikipedia.org/wiki/Iptables
