@@ -3,7 +3,7 @@
 require 'getoptlong'
 require 'socket'
 
-# The name of the collectd plugin, something like apache, memory, mysql, interface, ...
+# name of the collectd plugin, something like apache, memory, mysql, interface, ...
 PLUGIN_NAME = 'socktest'
 
 def usage
@@ -11,12 +11,12 @@ def usage
   exit
 end
 
-# Main
 begin
-  # Sync stdout so that it will flush to collectd properly. 
+
+  # dont buffer stdout so that it will flush to collectd immediately
   $stdout.sync = true
 
-  # Parse command line options
+  # parse command line options
   hostname = nil
   port = nil
   sampling_interval = 30  # sec, Default value
@@ -42,12 +42,12 @@ begin
 
   usage unless hostname and port and interface
 
-  # Collection loop
+  # collection loop
   while true do
     start_run = Time.now.to_i
     next_run = start_run + sampling_interval
 
-    # collectd data and print the values
+    # collect data and print the values
     begin
       s = TCPSocket.open(interface, port)
       data = '1'
@@ -59,7 +59,7 @@ begin
       s.close if s
     end
 
-    puts(%{PUTVAL "#{hostname}/#{PLUGIN_NAME}/gauge-socket_#{port}" #{start_run}:#{data}})
+    puts(%{PUTVAL "#{hostname}/#{PLUGIN_NAME}/socket_#{port}" #{start_run}:#{data}})
 
     # sleep to make the interval
     while((time_left = (next_run - Time.now.to_i)) > 0) do
