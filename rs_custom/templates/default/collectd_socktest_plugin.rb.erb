@@ -1,0 +1,69 @@
+#!/usr/bin/env ruby
+
+require 'getoptlong'
+require 'socket'
+
+# The name of the collectd plugin, something like apache, memory, mysql, interface, ...
+PLUGIN_NAME = 'socktest'
+
+def usage
+  puts("#{$0} -h <host_id> -n <interface> -p <port> [-i <sampling_interval>]")
+  exit
+end
+
+# Main
+begin
+  # Sync stdout so that it will flush to collectd properly. 
+  $stdout.sync = true
+
+  # Parse command line options
+  hostname = nil
+  port = nil
+  sampling_interval = 30  # sec, Default value
+  interface = '127.0.0.1'
+  opts = GetoptLong.new(
+    [ '--hostid',            '-h', GetoptLong::REQUIRED_ARGUMENT ],
+    [ '--port',              '-p', GetoptLong::REQUIRED_ARGUMENT ],
+    [ '--network-interface', '-n', GetoptLong::OPTIONAL_ARGUMENT ],
+    [ '--sampling-interval', '-i', GetoptLong::OPTIONAL_ARGUMENT ]
+  )
+  opts.each do |opt, arg|
+    case opt
+      when '--hostid'
+        hostname = arg
+      when '--port'
+        port = arg.to_i
+      when '--network-interface'
+        interface = arg
+      when '--sampling-interval'
+        sampling_interval = arg.to_i
+    end
+  end
+
+  usage unless hostname and port and interface
+
+  # Collection loop
+  while true do
+    start_run = Time.now.to_i
+    next_run = start_run + sampling_interval
+
+    # collectd data and print the values
+    begin
+      s = TCPSocket.open(interface, port)
+      data = '1'
+    rescue Errno::ECONNREFUSED
+      data = '0'
+    rescue
+      data = '0'
+    ensure
+      s.close if s
+    end
+
+    puts(%{PUTVAL "#{hostname}/#{PLUGIN_NAME}/gauge-socket_#{port}" #{start_run}:#{data}})
+
+    # sleep to make the interval
+    while((time_left = (next_run - Time.now.to_i)) > 0) do
+      sleep(time_left)
+    end
+  end
+end

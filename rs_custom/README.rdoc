@@ -1,0 +1,11 @@
+= DESCRIPTION:
+
+Custom chef scripts for use in RightScale:
+
+ - Socktest: Collectd plugin monitors connectivety to sockets
+
+= REQUIREMENTS:
+
+= ATTRIBUTES:
+
+= USAGE:

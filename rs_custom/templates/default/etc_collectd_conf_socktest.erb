@@ -1,0 +1,5 @@
+LoadPlugin exec
+<Plugin exec>
+  #     userid    plugin executable            plugin        args
+  Exec "nobody" "/usr/lib/collectd/socktest.rb" "-h" "<%= node[:rightscale][:instance_uuid] %>" "-p" "<%= @port %>"
+</Plugin>
