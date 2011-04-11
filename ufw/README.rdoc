@@ -24,17 +24,17 @@ If you don't specify an attribute then it gets its default value.  You MUST spec
 
 Let's explain with a couple examples.  Imagine we are in a recipe:
 
-# First pull in the UFW recipe
-require "ufw::default"
+  # First pull in the UFW recipe
+  require "ufw::default"
 
-# Next let's say you add ruby on rails
-require "myapp::rails"
+  # Next lets say you add ruby on rails
+  require "myapp::rails"
 
-# Finally open up the firewall for rails dev
-ufw_rule "firewall allow rails" do
-  port "3000"
-  from "10.0.0.0/8"
-end
+  # Finally open up the firewall for rails dev
+  ufw_rule "firewall allow rails" do
+    port "3000"
+    from "10.0.0.0/8"
+  end
 
 = COPYRIGHT:
 
