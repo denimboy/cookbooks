@@ -1,0 +1,31 @@
+{
+  "dependencies": {
+  },
+  "name": "postgresql",
+  "maintainer_email": "youremail@example.com",
+  "attributes": {
+  },
+  "license": "Apache v2.0",
+  "suggestions": {
+  },
+  "platforms": {
+  },
+  "maintainer": "Your Name",
+  "long_description": "",
+  "version": "0.0.0",
+  "recommendations": {
+  },
+  "recipes": {
+    "postgresql::default": "Does nothing.",
+    "postgresql::source": "Installs postgresql from source."
+  },
+  "groupings": {
+  },
+  "conflicting": {
+  },
+  "replacing": {
+  },
+  "description": "Installs and configures postgresql",
+  "providing": {
+  }
+}

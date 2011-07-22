@@ -1,10 +1,8 @@
 
-node[:platform] = 'ubuntu'
-execute "update" do
-  command %{apt-get update; apt-get upgrade}
-  ignore_failure true
-end
-
+#
+# Compile from source as written up by Depesz in
+#   http://www.depesz.com/index.php/2010/02/26/installing-postgresql/
+#
 
 case node[:platform]
 when "arch"
