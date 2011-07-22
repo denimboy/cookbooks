@@ -1,0 +1,17 @@
+#!/bin/bash
+
+./configure                     \
+  --prefix=/opt/pgsql-8.4.2     \
+  --with-pgport=5840            \
+  --with-tcl                    \
+  --with-perl                   \
+  --with-python                 \
+  --enable-integer-datetimes    \
+  --without-krb5                \
+  --without-pam                 \
+  --without-bonjour             \
+  --without-openssl             \
+  --with-readline               \
+  --with-libxml                 \
+  --with-zlib                   \
+  --with-gnu-ld

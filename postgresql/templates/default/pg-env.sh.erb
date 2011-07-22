@@ -1,0 +1,10 @@
+#!/bin/bash
+
+VERSION="$1"
+if [[ -z "$VERSION" ]]
+then
+    VERSION=$( /bin/ls -dc1 /opt/pgsql-* | sort -t. -nrk 3,3 | sort -t. -nsrk 2,2 | sort -t- -snrk 2,2 | head -n 1 | cut -d- -f2 )
+fi
+STRIPPED_PATH="$( echo $PATH | sed 's#\(^\|:\)/opt/pgsql[^:]*:\?#\1#' )"
+export PATH="/opt/pgsql-$VERSION/bin:$STRIPPED_PATH"
+echo "Pg version $VERSION chosen"
