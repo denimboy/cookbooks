@@ -4,6 +4,7 @@
 #   http://www.depesz.com/index.php/2010/02/26/installing-postgresql/
 #
 
+# Install prereqs
 case node[:platform]
 when "arch"
   lis = %w{gcc python libxml2 tcl make}
@@ -25,39 +26,53 @@ lis.each do |pkg|
   package pkg
 end
 
-
-group "pgdba" do
+# Create postgres DBA user
+group "#{node[:postgres][:dba]}" do
   action :create
 end
 
-user "pgdba" do
+user "#{node[:postgres][:dba]}" do
   comment "System account for running PostgreSQL"
-  gid "pgdba"
-  home "/home/pgdba"
+  gid "#{node[:postgres][:dba]}"
+  home "#{node[:postgres][:basedir]}/home"
   shell "/bin/bash"
 end
 
-#base = %{/tmp}
-#dest = "#{base}/postgresql-8.4.2"
-#tar = #{dest}.tar.bz2
-remote_file "/tmp/postgresql-8.4.8.tar.bz" do
-  source "http://wwwmaster.postgresql.org/redir/198/h/source/v8.4.8/postgresql-8.4.8.tar.bz2"
-  not_if { File.exists?("/tmp/postgresql-8.4.8.tar.bz2") }
+directory "#{node[:postgres][:basedir]}/home" do
+  owner node[:postgres][:dba]
+  mode "0750"
+  recursive true
+  action :create
+end
+
+template "#{node[:postgres][:basedir]}/home/.profile" do
+  source "bashrc.erb"
+  owner node[:postgres][:dba]
+  mode "0644"
+  action :create
+end
+
+# Fetch postgres source tarball
+remote_file "/tmp/postgresql-#{node[:postgres][:version]}.tar.bz" do
+  source "http://wwwmaster.postgresql.org/redir/198/h/source/v#{node[:postgres][:version]}/postgresql-#{node[:postgres][:version]}.tar.bz2"
+  not_if { File.exists?("/tmp/postgresql-#{node[:postgres][:version]}.tar.bz2") }
 end
 
 execute "untar" do
   cwd "/tmp"
-  command %{tar xjf /tmp/postgresql-8.4.8.tar.bz}
-#  not_if { File.exists?("/tmp/postgresql-8.4.8"}) }  
+  command %{tar xjf /tmp/postgresql-#{node[:postgres][:version]}.tar.bz}
+  not_if { File.exists?("/tmp/postgresql-#{node[:postgres][:version]}") }  
 end
 
-template "/tmp/postgresql-8.4.8/my.configure.sh" do
+
+# Configure and compile
+template "/tmp/postgresql-#{node[:postgres][:version]}/my.configure.sh" do
   source "my.configure.erb"
   mode "0700"
 end
 
 bash "Compile Postgres" do
-  cwd "/tmp/postgresql-8.4.8/"
+  cwd "/tmp/postgresql-#{node[:postgres][:version]}/"
   code <<-EOH
     ./my.configure.sh
     make
@@ -67,7 +82,7 @@ bash "Compile Postgres" do
     make install
     cd ..
   EOH
-#  not_if { File.exists?("#{node[:postgresql][:install_path]}/bin/postgres") }
+  not_if { File.exists?("#{node[:postgres][:basedir]}/bin/postgres") }
 end
 
 

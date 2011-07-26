@@ -1,8 +1,8 @@
 #!/bin/bash
 
 ./configure                     \
-  --prefix=/opt/pgsql-8.4.2     \
-  --with-pgport=5840            \
+  --prefix=<%= node[:postgres][:basedir] %>-<%= node[:postgres][:version] %>     \
+  --with-pgport=<%= node[:postgres][:port] %>            \
   --with-tcl                    \
   --with-perl                   \
   --with-python                 \

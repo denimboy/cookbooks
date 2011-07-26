@@ -2,17 +2,59 @@
   "dependencies": {
   },
   "name": "postgresql",
-  "maintainer_email": "youremail@example.com",
+  "maintainer_email": "cookbooks@brainamp.com",
   "attributes": {
+    "postgres/dba": {
+      "required": "optional",
+      "calculated": false,
+      "choice": [
+
+      ],
+      "default": "postgres",
+      "type": "string",
+      "recipes": [
+        "postgresql::source"
+      ],
+      "display_name": "Postgres DBA user",
+      "description": "Admin user for postgres database.."
+    },
+    "postgres/version": {
+      "required": "optional",
+      "calculated": false,
+      "choice": [
+
+      ],
+      "default": "8.4.4",
+      "type": "string",
+      "recipes": [
+        "postgresql::source"
+      ],
+      "display_name": "Postgres version",
+      "description": "Which version of postgres will be installed."
+    },
+    "postgres/basedir": {
+      "required": "optional",
+      "calculated": false,
+      "choice": [
+
+      ],
+      "default": "/opt/postgres",
+      "type": "string",
+      "recipes": [
+        "postgresql::source"
+      ],
+      "display_name": "Postgres basedir",
+      "description": "Base directory where postgres will be installed."
+    }
   },
-  "license": "Apache v2.0",
+  "license": "All rights reserved",
   "suggestions": {
   },
   "platforms": {
   },
-  "maintainer": "Your Name",
+  "maintainer": "Dennis Watson",
   "long_description": "",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "recommendations": {
   },
   "recipes": {
@@ -25,7 +67,7 @@
   },
   "replacing": {
   },
-  "description": "Installs and configures postgresql",
+  "description": "Build postgres from source, install and configure.",
   "providing": {
   }
 }
