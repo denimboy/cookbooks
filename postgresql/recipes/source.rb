@@ -7,22 +7,22 @@
 # Install prereqs
 case node[:platform]
 when "arch"
-  lis = %w{gcc python libxml2 tcl make}
+  prereqs = %w{gcc python libxml2 tcl make}
 when "centos"
-  lis = %w{gcc readline-devel zlib-devel libxml2-devel tcl-devel python-devel}
+  prereqs = %w{gcc readline-devel zlib-devel libxml2-devel tcl-devel python-devel}
 when "debian"
-  lis = %w{apt-get install bzip2 build-essential libreadline-dev zlib1g-dev libxml2-dev tcl-dev python-dev}
+  prereqs = %w{apt-get install bzip2 build-essential libreadline-dev zlib1g-dev libxml2-dev tcl-dev python-dev}
 when "fedora"
-  lis = %w{gcc perl-core readline-devel zlib-devel libxml2-devel tcl-devel python-devel}
+  prereqs = %w{gcc perl-core readline-devel zlib-devel libxml2-devel tcl-devel python-devel}
 when "ubuntu"
-  lis = %w{ build-essential libreadline-dev zlib1g-dev libxml2-dev tcl-dev python-dev libperl-dev}
+  prereqs = %w{ build-essential libreadline-dev zlib1g-dev libxml2-dev tcl-dev python-dev libperl-dev}
 when "suse"
-  lis = %w{zypper install gcc make readline-devel zlib-devel openssl-devel libxml2-devel tcl-devel python-devel}
+  prereqs = %w{zypper install gcc make readline-devel zlib-devel openssl-devel libxml2-devel tcl-devel python-devel}
 else
-  lis = %w{}
+  prereqs = %w{}
 end
 
-lis.each do |pkg|
+prereqs.each do |pkg|
   package pkg
 end
 
@@ -34,55 +34,61 @@ end
 user "#{node[:postgres][:dba]}" do
   comment "System account for running PostgreSQL"
   gid "#{node[:postgres][:dba]}"
-  home "#{node[:postgres][:basedir]}/home"
+  home "#{node[:postgres][:basedir]}-#{node[:postgres][:version]}/home"
   shell "/bin/bash"
 end
 
-directory "#{node[:postgres][:basedir]}/home" do
+directory "#{node[:postgres][:basedir]}-#{node[:postgres][:version]}/home" do
   owner node[:postgres][:dba]
   mode "0750"
   recursive true
   action :create
 end
 
-template "#{node[:postgres][:basedir]}/home/.profile" do
-  source "bashrc.erb"
+template "#{node[:postgres][:basedir]}-#{node[:postgres][:version]}/home/.profile" do
+  source "dot_profile.erb"
   owner node[:postgres][:dba]
   mode "0644"
   action :create
 end
 
-# Fetch postgres source tarball
-remote_file "/tmp/postgresql-#{node[:postgres][:version]}.tar.bz" do
+# Fetch postgres source
+remote_file "/root/postgresql-#{node[:postgres][:version]}.tar.bz" do
   source "http://wwwmaster.postgresql.org/redir/198/h/source/v#{node[:postgres][:version]}/postgresql-#{node[:postgres][:version]}.tar.bz2"
-  not_if { File.exists?("/tmp/postgresql-#{node[:postgres][:version]}.tar.bz2") }
+  not_if { File.exists?("/root/postgresql-#{node[:postgres][:version]}.tar.bz2") or
+    File.exists?("/root/postgresql-#{node[:postgres][:version]}") }
 end
 
-execute "untar" do
-  cwd "/tmp"
-  command %{tar xjf /tmp/postgresql-#{node[:postgres][:version]}.tar.bz}
-  not_if { File.exists?("/tmp/postgresql-#{node[:postgres][:version]}") }  
+execute "untar postgres source" do
+  cwd "/root"
+  command %{tar xjf /root/postgresql-#{node[:postgres][:version]}.tar.bz}
+  not_if { File.exists?("/root/postgresql-#{node[:postgres][:version]}") }  
 end
-
 
 # Configure and compile
-template "/tmp/postgresql-#{node[:postgres][:version]}/my.configure.sh" do
+template "/root/postgresql-#{node[:postgres][:version]}/my.configure.sh" do
   source "my.configure.erb"
   mode "0700"
 end
 
+# see http://www.postgresql.org/docs/9.0/interactive/install-procedure.html
 bash "Compile Postgres" do
-  cwd "/tmp/postgresql-#{node[:postgres][:version]}/"
+  cwd "/root/postgresql-#{node[:postgres][:version]}/"
   code <<-EOH
     ./my.configure.sh
-    make
-    make install
-    cd contrib
-    make
-    make install
-    cd ..
+    make world
+    make install-world
+    #cd contrib
+    #make
+    #make install
+    #cd ..
   EOH
-  not_if { File.exists?("#{node[:postgres][:basedir]}/bin/postgres") }
+  not_if { File.exists?("#{node[:postgres][:basedir]}-#{node[:postgres][:version]}/bin/postgres") }
 end
 
-
+template "#{node[:postgres][:basedir]}-#{node[:postgres][:version]}/bin/pg-env.sh" do
+  source "pg-env.sh.erb"
+  owner node[:postgres][:dba]
+  mode "0644"
+  action :create
+end
