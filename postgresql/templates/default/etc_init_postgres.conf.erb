@@ -1,0 +1,7 @@
+start on runlevel [2345]
+stop on runlevel [016]
+respawn
+
+script
+exec su -c "<%= node[:postgres][:basedir] %>-<%= node[:postgres][:version] %>/bin/postgres -D <%= node[:postgres][:basedir] %>-<%= node[:postgres][:version] %>/data" <%= node[:postgres][:dba] %>
+end script

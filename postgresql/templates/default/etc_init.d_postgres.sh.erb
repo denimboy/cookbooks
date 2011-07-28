@@ -1,0 +1,355 @@
+#! /bin/sh
+
+### BEGIN INIT INFO
+# Provides: postgresql
+# Required-Start: $local_fs $network $syslog
+# Should-Start: $remote_fs $named $time
+# Required-Stop: $local_fs $network $syslog
+# Should-Stop: $remote_fs $named
+# Default-Start: 2 3 4 5
+# Default-Stop: 0 1 6
+# Short-Description: PostgreSQL RDBMS
+# Description: PostgreSQL RDBMS service.
+#              The world's most advanced open source database.
+#              See http://www.postgresql.org/ for more information.
+### END INIT INFO
+
+# This is an example of a Linux LSB conforming init script.
+# See http://refspecs.freestandards.org/ for more information on LSB.
+
+# Original author:  Kevin Grittner
+
+# $PostgreSQL$
+
+#--------------------------------------------------------------------
+# The only edits needed should be in the INIT INFO block above
+# and between the lines of dashes below.  If any other
+# changes are needed, or you find a way to enhance the script,
+# consider posting to the PostgreSQL hackers list.
+#--------------------------------------------------------------------
+
+# Installation prefix
+prefix="/usr/local/pgsql"
+prefix="/usr/local/pgsql-8.5devel"
+
+# Data directory (Don't end with a slash.)
+PGDATA="/var/local/pgsql/data"
+PGDATA="/var/pgsql/data/test3"
+
+# Who to run the postmaster as, usually "postgres".  (NOT "root")
+PGUSER=postgres
+PGUSER=kgrittn
+
+# Where to keep a log file
+PGLOG="$PGDATA/serverlog"
+
+#--------------------------------------------------------------------
+
+# The path that is to be used for the script
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+# The LSB functions must be present.
+lsbf=/lib/lsb/init-functions
+test -r "$lsbf" || {
+    echo "$0: not able to read $lsbf: script cannot run" 1>&2
+    exit 5
+  }
+
+# Source the functions.
+. "$lsbf"
+# Most output from the script should be through the LSB msg functions after this.
+# In particular, messages indicating success, failure, or warning must use the LSB functions.
+# Progress information may be output to stdout or stderr; although it should be understood
+# that it might not be shown to the user or written to any log or file.
+
+# Define usage string, used in more than one place.
+usage="Usage: $0 {start|stop|restart|try-restart|reload|force-reload|status}"
+
+# Check that we have one parameter: action
+if [ $# -ne 1 ] ; then
+  if [ $# -lt 1 -o "$1" = "" ] ; then
+    log_failure_msg "$0: action not specified"
+  else
+    log_failure_msg "$0: too many parameters"
+  fi
+  log_warning_msg "$usage"
+  exit 2
+fi
+action="$1"
+
+# What to use to manipulate the postmaster.
+PGCTL="$prefix/bin/pg_ctl"
+
+# Only start if we can find the $PGCTL executable.
+test -x "$PGCTL" || {
+    if [ "$action" = "stop" ] ; then
+      log_warning_msg "$0: executable $PGCTL not found: $action request ignored"
+      exit 0
+    else
+      log_failure_msg "$0: executable $PGCTL not found: $action request failed"
+      exit 5
+    fi
+  }
+
+pidfile="$PGDATA/postmaster.pid"
+servicename=$( basename "$0" )
+
+ulimit -c unlimited
+
+# Assuming the first line of the pid file contains (at most) one pid, return it.
+pg_initd_pid () {
+  head -1 "$pidfile" 2>/dev/null
+}
+
+# Count how many processes named postgres* are using the data directory.
+pg_initd_process_count () {
+  lsof -a -c postgres | grep "$PGDATA/" | wc -l
+}
+
+# Count how many streams are open for connecting to the pid, TCP and UNIX sockets.
+pg_initd_socket_count () {
+  pgpid=$( pg_initd_pid )
+  if [ "$pgpid" = "" ] ; then
+    echo "-1"
+  else
+    echo $(( $( lsof -at -p "$pgpid" -U | wc -l ) \
+           + $( lsof -a -p "$pgpid" -itcp | grep LISTEN | wc -l ) ))
+  fi
+}
+
+pg_initd_start () {
+  echo -n "Starting $servicename: "
+  su -c "'$PGCTL' -w -D '$PGDATA' -l '$PGLOG' start" - $PGUSER
+  rc=$?
+  if [ $rc -ne 0 ] ; then
+    return
+  fi
+  # pg_ctl can be fooled by a competing postmaster which has already grabbed the port;
+  # the test initiated by -w can indicate success, based on talking to the other process.
+  # Check that the pid we just created matches an open server socket of some sort.
+  if [ $( pg_initd_socket_count ) -gt 0 ] ; then
+    return
+  fi
+  log_warning_msg "$servicename $action: a competing instance of PostgreSQL may be running"
+  rc=1
+}
+
+pg_initd_stop () {
+  # This will be called when the server is shutting down.
+  # If this function never exits, the server hangs forever in a partially shut down state,
+  # possibly requiring a hard reboot without shutting down other services.
+  # If this function exits before PostgreSQL is completely shut down, any remaining
+  # processes will probably be killed with -9 -- which is not recommended.
+  # Try very hard to avoid either of the above.
+  pgpid=$( pg_initd_pid )
+  if [ "$pgpid" = "" ] ; then
+    # If this happens, the process went away after the initial check.
+    echo "$servicename: not running"
+    rc=0
+    return
+  fi
+  echo -n "Shutting down $servicename: "
+  su -c "kill -s SIGINT '$pgpid'" - $PGUSER
+  echo -n 'waiting for server to stop...'
+  rc=1
+  # Try "fast" shutdown for a while.
+  for seconds in $( seq 50 ) ; do
+    echo -n '.'
+    if ! ps -o pid= -p "$pgpid" >/dev/null ; then
+      rc=0
+      break
+    fi
+    sleep 1
+  done
+  # Fast didn't do it; try immediate shutdown.
+  if [ $rc -ne 0 ] ; then
+    su -c "kill -s SIGQUIT '$pgpid'" - $PGUSER
+    for seconds in $( seq 10 ) ; do
+      echo -n '!'
+      if ! ps -o pid= -p "$pgpid" >/dev/null ; then
+        rc=0
+        break
+      fi
+      sleep 1
+    done
+  fi
+  ! ps -o pid= -p "$pgpid" >/dev/null
+  rc=$?
+  if [ "$rc" -eq 0 ] ; then
+    echo ' done'
+    rm -f "$pidfile"
+  else
+    echo ' failed'
+  fi
+}
+
+pg_initd_reload () {
+  su -c "$PGCTL reload -D '$PGDATA'" - $PGUSER
+  rc=$?
+}
+
+pg_initd_status () {
+  if [ ! -f "$pidfile" ] ; then
+    if [ $( pg_initd_process_count ) -ne 0 ] ; then
+      log_warning_msg "$servicename $action: orphaned postgres processes may exist"
+      rc=4
+    else
+      rc=3
+    fi
+    return
+  fi
+  # pid file found
+  pgpid=$( pg_initd_pid )
+  if [ $( stat -c%U "$PGDATA" ) != "$PGUSER" ] ; then
+    log_warning_msg "$servicename $action: data directory \"$PGDATA\" not owned by \"$PGUSER\""
+    rc=4
+    return
+  fi
+  su -c "$PGCTL status -D '$PGDATA'" - $PGUSER
+  rc=$?
+  if [ $rc -ne 0 ] ; then
+    # pg_ctl doesn't return LSB conforming values; treat non-success as "unknown" failure.
+    rc=4
+  fi
+}
+
+pg_initd_exit () {
+  if [ "$action" = "status" ] ; then
+    case $rc in
+      0)
+        log_success_msg "$servicename $action: running"
+        ;;
+      1)
+        log_failure_msg "$servicename $action: dead with existing pid file: $pidfile"
+        ;;
+      3)
+        log_failure_msg "$servicename $action: not running"
+        ;;
+      *)
+        log_failure_msg "$servicename $action: unknown ($rc)"
+        ;;
+    esac
+  else
+    case $rc in
+      0)
+        log_success_msg "$servicename $action: done"
+        ;;
+      1)
+        log_failure_msg "$servicename $action: failed"
+        ;;
+      4)
+        log_failure_msg "$servicename $action: insufficient privilege"
+        ;;
+      7)
+        log_failure_msg "$servicename $action: not running"
+        ;;
+      *)
+        log_failure_msg "$servicename $action: failed ($rc)"
+        ;;
+    esac
+  fi
+  exit $rc
+}
+
+# Actions other than status may use these return codes:
+#  1 - generic or unspecified error
+#  2 - invalid or excess argument(s)
+#  3 - unimplemented feature (for example, "reload")
+#  4 - user had insufficient privilege
+#  5 - program is not installed
+#  6 - program is not configured
+#  7 - program is not running
+# Some of these are tested before getting to this case statement.
+case "$action" in
+  start)
+    # Start the service.
+    # If already running, return success without start attempt.
+    pg_initd_status
+    if [ $rc -eq 0 ] ; then
+      log_warning_msg "$servicename $action: service already running; no action taken"
+      pg_initd_exit
+    fi
+    pg_initd_start
+    pg_initd_exit
+    ;;
+  stop)
+    # Stop the service.
+    # If not running, return success without stop attempt.
+    pg_initd_status
+    if [ $rc -eq 3 ] ; then
+      log_warning_msg "$servicename $action: service not running; no action taken"
+      rc=0
+      pg_initd_exit
+    fi
+    if [ $rc -ne 0 ] ; then
+      rc=1
+      pg_initd_exit
+    fi
+    pg_initd_stop
+    pg_initd_exit
+    ;;
+  restart)
+    # Stop and restart the service if the service is already running,
+    # otherwise start the service.
+    pg_initd_status
+    if [ $rc -eq 3 ] ; then
+      log_warning_msg "$servicename $action: service not running; no attempt to stop"
+    else
+      pg_initd_stop
+      if [ $rc -ne 0 ] ; then
+        pg_initd_exit
+      fi
+    fi
+    pg_initd_start
+    pg_initd_exit
+    ;;
+  try-restart)
+    # Restart the service if the service is already running.
+    # If stopped, return success without stop attempt.
+    pg_initd_status
+    if [ $rc -eq 3 ] ; then
+      log_warning_msg "$servicename $action: service not running; no action taken"
+      rc=0
+      pg_initd_exit
+    fi
+    if [ $rc -ne 0 ] ; then
+      pg_initd_exit
+    fi
+    pg_initd_stop
+    if [ $rc -ne 0 ] ; then
+      pg_initd_exit
+    fi
+    pg_initd_start
+    pg_initd_exit
+    ;;
+  reload|force-reload)
+    # Cause the configuration of the service to be reloaded
+    # without actually stopping and restarting the service.
+    # (Since PostgreSQL supports reload, force-reload should use that.)
+    pg_initd_status
+    if [ $rc -eq 3 ] ; then
+      rc=7
+      pg_initd_exit
+    fi
+    pg_initd_reload
+    pg_initd_exit
+    ;;
+  status)
+    # Print the current status of the service.
+    # Return codes differ from other actions:
+    #  0 - program is running or service is OK
+    #  1 - program is dead and /var/run pid file exists
+    #  2 - program is dead and /var/lock lock file exists
+    #  3 - program is not running
+    #  4 - program or service status is unknown
+    pg_initd_status
+    pg_initd_exit
+    ;;
+  *)
+    # If we don't recognize action, consider it an invalid argument.
+    # If the standard adds actions we don't support, exit should be 3 for those.
+    log_failure_msg "$0: action \"$action\" not recognized"
+    log_warning_msg "$usage"
+    exit 2
+    ;;
+esac

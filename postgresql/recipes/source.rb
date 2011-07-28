@@ -75,19 +75,67 @@ end
 bash "Compile Postgres" do
   cwd "/root/postgresql-#{node[:postgres][:version]}/"
   code <<-EOH
-    ./my.configure.sh
-    make world
-    make install-world
-    #cd contrib
-    #make
-    #make install
-    #cd ..
+    #./my.configure.sh
+    ./configure --prefix=#{node[:postgres][:basedir]}-#{node[:postgres][:version]}
+    make
+    make install
   EOH
   not_if { File.exists?("#{node[:postgres][:basedir]}-#{node[:postgres][:version]}/bin/postgres") }
 end
 
+bash "Compile contribs" do
+  cwd "/root/postgresql-#{node[:postgres][:version]}/"
+  code <<-EOH
+    cd contrib
+    make
+    make install
+  EOH
+  not_if { File.exists?("#{node[:postgres][:basedir]}-#{node[:postgres][:version]}/bin/postgres") }
+end
+
+# env script
 template "#{node[:postgres][:basedir]}-#{node[:postgres][:version]}/bin/pg-env.sh" do
   source "pg-env.sh.erb"
+  owner node[:postgres][:dba]
+  mode "0644"
+  action :create
+end
+
+# upstart script
+template "/etc/init/postgres.conf" do
+  source "etc_init_postgres.conf.erb"
+  mode "0644"
+  action :create
+end
+
+service "postgres" do
+  provider Chef::Provider::Service::Upstart
+  action [ :enable, :start ]
+end
+
+# Create database
+directory "#{node[:postgres][:basedir]}-#{node[:postgres][:version]}/data" do
+  owner node[:postgres][:dba]
+  mode "0750"
+  action :create
+end
+
+execute "initalize database" do
+  user node[:postgres][:dba]
+  command "#{node[:postgres][:basedir]}-#{node[:postgres][:version]}/bin/initdb -D #{node[:postgres][:basedir]}-#{node[:postgres][:version]}/data/"
+  not_if { File.exists?("#{node[:postgres][:basedir]}-#{node[:postgres][:version]}/data/PG_VERSION") }
+end
+
+# install pg configs
+template "#{node[:postgres][:basedir]}-#{node[:postgres][:version]}/data/pg_hba.conf" do
+  source "pg_hba.conf"
+  owner node[:postgres][:dba]
+  mode "0644"
+  action :create
+end
+
+template "#{node[:postgres][:basedir]}-#{node[:postgres][:version]}/data/postgresql.conf" do
+  source "postgresql.conf"
   owner node[:postgres][:dba]
   mode "0644"
   action :create
